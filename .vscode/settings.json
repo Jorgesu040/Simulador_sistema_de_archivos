@@ -1,5 +1,7 @@
 {
-    "files.associations": {
-        "cabeceras.h": "c"
-    }
+  "files.associations": {
+    "cabeceras.h": "c"
+  },
+  "C_Cpp_Runner.msvcBatchPath": "",
+  "C_Cpp.default.compilerPath": "gcc"
 }

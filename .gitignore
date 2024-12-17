@@ -1,4 +1,5 @@
 *.pdf
 *.md
-.vscode/
+.vscode/*
+.vscode/settings.json
 .editorconfig
