@@ -293,7 +293,10 @@ int Imprimir(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, EXT_DATOS* mem
          }
          j++;
       } while((blnumber != NULL_BLOQUE) && (j < MAX_NUMS_BLOQUE_INODO));
-      printf("%s\n", datosfichero);
+      for (int k = 0; k < j; k++) {
+          printf("%s", datosfichero[k].dato);
+      }
+      printf("\n");
    }
 
    return -2; // no se encuentra el fichero
