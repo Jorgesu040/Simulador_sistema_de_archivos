@@ -110,9 +110,8 @@ int main()
 void ProcesarComando(char* orden, char* argumento1, char* argumento2,
    EXT_SIMPLE_SUPERBLOCK* ext_superblock, EXT_BYTE_MAPS* ext_bytemaps,
    EXT_BLQ_INODOS* ext_blq_inodos, EXT_ENTRADA_DIR* directorio,
-   EXT_DATOS* memdatos, FILE* fent)
-{
-
+   EXT_DATOS* memdatos, FILE* fent) {
+      
    if (strcmp(orden, "info") == 0) {
       LeeSuperBloque(ext_superblock);
    }
@@ -197,8 +196,11 @@ int ComprobarComando(char* strcomando, char* orden, char* argumento1, char* argu
       token = strtok(NULL, " ");
       contadorArgumentos++;
    }
-
-   if (contadorArgumentos > 3 || contadorArgumentos == 0)
+   
+   if (strcmp(orden, "") == 0) {
+      comandoValido = -1;
+   }
+   else if (contadorArgumentos > 3 || contadorArgumentos == 0)
    {
       printf("Error: Numero de argumentos incorrecto\n");
    }
