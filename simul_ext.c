@@ -251,7 +251,19 @@ void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK* psup) {
 }
 
 int BuscaFich(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, char* nombre) {
-   return 0;
+   // Implementación de la función para buscar un archivo
+
+   int i, tam;
+   for(i = 0; i < MAX_FICHEROS; i++){
+      tam = inodos->blq_inodos[directorio[i].dir_inodo].size_fichero;
+      if(tam > 0){
+         if(strcmp( nombre, directorio[i].dir_nfich) == 0){
+            return i; // se encuentra el fichero
+         }
+      }
+   }
+
+   return -1; // no se encuentra el fichero
 }
 void Directorio(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos)
 {
@@ -267,7 +279,24 @@ int Renombrar(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, char* nombrea
 int Imprimir(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, EXT_DATOS* memdatos, char* nombre)
 {
    // Implementación de la función para imprimir el contenido de un archivo
-   return 0;
+
+   int i, j;
+   unsigned long int blnumber;
+   EXT_DATOS datosfichero[MAX_NUMS_BLOQUE_INODO];
+   i = BuscaFich(directorio, inodos, nombre);
+   if (i>0){
+      j = 0;
+      do{
+         blnumber = inodos->blq_inodos[directorio[i].dir_inodo].i_nbloque[j];
+         if(blnumber != NULL_BLOQUE){
+            datosfichero[j] = memdatos[blnumber - PRIM_BLOQUE_DATOS];
+         }
+         j++;
+      } while((blnumber != NULL_BLOQUE) && (j < MAX_NUMS_BLOQUE_INODO));
+      printf("%s\n", datosfichero);
+   }
+
+   return -2; // no se encuentra el fichero
 }
 
 int Borrar(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, EXT_BYTE_MAPS* ext_bytemaps, EXT_SIMPLE_SUPERBLOCK* ext_superblock, char* nombre, FILE* fich)
@@ -285,19 +314,37 @@ int Copiar(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, EXT_BYTE_MAPS* e
 void Grabarinodosydirectorio(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, FILE* fich)
 {
    // Implementación de la función para grabar inodos y directorio
+
+   fseek(fich, 2*SIZE_BLOQUE, SEEK_SET);
+   fwrite(inodos, 1, SIZE_BLOQUE, fich);
+   fseek(fich, 3*SIZE_BLOQUE, SEEK_SET);
+   fwrite(directorio, 1, SIZE_BLOQUE, fich);
+
 }
 
 void GrabarByteMaps(EXT_BYTE_MAPS* ext_bytemaps, FILE* fich)
 {
    // Implementación de la función para grabar los mapas de bytes
+
+   fseek(fich, SIZE_BLOQUE, SEEK_SET);
+   fwrite(ext_bytemaps, 1, sizeof(EXT_BYTE_MAPS), fich);
+
 }
 
 void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK* ext_superblock, FILE* fich)
 {
    // Implementación de la función para grabar el superbloque
+
+   fseek(fich, 0, SEEK_SET);
+   fwrite(ext_superblock, 1, SIZE_BLOQUE, fich);
+
 }
 
 void GrabarDatos(EXT_DATOS* memdatos, FILE* fich)
 {
    // Implementación de la función para grabar los datos
+
+   fseek(fich, 4*SIZE_BLOQUE, SEEK_SET);
+   fwrite(memdatos, MAX_BLOQUES_DATOS, SIZE_BLOQUE, fich);
+
 }
