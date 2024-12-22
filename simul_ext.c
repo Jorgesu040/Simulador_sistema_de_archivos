@@ -54,7 +54,7 @@ int main()
    int grabardatos;
    FILE* fent;
 
-   // Lectura del fichero completo de una sola vez
+   // Lectura del fichero completo de una sola /vez
 
    fent = fopen("particion.bin", "r+b");
 
@@ -255,10 +255,12 @@ int BuscaFich(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, char* nombre)
 
    int i, tam;
    for(i = 0; i < MAX_FICHEROS; i++){
-      tam = inodos->blq_inodos[directorio[i].dir_inodo].size_fichero;
-      if(tam > 0){
-         if(strcmp( nombre, directorio[i].dir_nfich) == 0){
-            return i; // se encuentra el fichero
+      if (directorio[i].dir_inodo != NULL_INODO) {
+         tam = inodos->blq_inodos[directorio[i].dir_inodo].size_fichero;
+         if(tam > 0){
+            if(strcmp( nombre, directorio[i].dir_nfich) == 0){
+               return i; // se encuentra el fichero
+            }
          }
       }
    }
@@ -267,7 +269,27 @@ int BuscaFich(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, char* nombre)
 }
 void Directorio(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos)
 {
-   // Implementación de la función para listar el directorio
+   for(int i = 0; i < MAX_FICHEROS; i++) {
+      // Comprueba si el inodo no es nulo y si no es el propio directorio
+      if (directorio[i].dir_inodo != NULL_INODO && directorio[i].dir_nfich[0] != '.' ) {
+         
+         unsigned int tam = inodos->blq_inodos[directorio[i].dir_inodo].size_fichero;
+         if(tam > 0){
+            unsigned int numNodo = directorio[i].dir_inodo;
+            unsigned short *numBloques = inodos->blq_inodos[numNodo].i_nbloque;
+            printf("Nombre: %s\tTamaño: %u\ti-nodo: %u Bloques: [ ", directorio[i].dir_nfich, tam, numNodo);
+            for (int j = 0; j < MAX_NUMS_BLOQUE_INODO; j++) {
+               if (numBloques[j] != NULL_BLOQUE && numBloques[j+1] != NULL_BLOQUE) {
+                  printf("%hu, ", numBloques[j]);
+               } else if(numBloques[j] != NULL_BLOQUE){
+                  printf("%hu", numBloques[j]);
+               }
+            }
+            printf(" ] \n");
+         
+         }
+      }   
+   }
 }
 
 int Renombrar(EXT_ENTRADA_DIR* directorio, EXT_BLQ_INODOS* inodos, char* nombreantiguo, char* nombrenuevo)
