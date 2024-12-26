@@ -332,8 +332,24 @@ void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos)
 
 int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo)
 {
-   // Implementación de la función para renombrar un archivo
-   return 0;
+   
+   int posicionInodoEnDirectorio;
+   int renombradoCorrecto = 0;
+
+   if ((posicionInodoEnDirectorio = BuscaFich(directorio, inodos, nombreantiguo)) == -1) {
+      printf("El fichero seleccionado para renombrar no existe\n");
+   } else if (strlen(nombrenuevo) > LEN_NFICH - 1) {
+      // strlen no cuenta el \0 asi que el maximo es LONGITUD_NFICH - 1
+      printf("El nombre del fichero es demasiado largo\n");
+      renombradoCorrecto = -1;
+   } else {
+      strcpy(directorio[posicionInodoEnDirectorio].dir_nfich, nombrenuevo);
+      renombradoCorrecto = 1;
+      printf("Fichero renombrado correctamente\n");
+   }
+
+
+   return renombradoCorrecto;
 }
 
 int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre)
@@ -368,42 +384,41 @@ int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *mem
 
 int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, char *nombre, FILE *fich)
 {  
-
    int posicionInodoEnDirectorio;
    int inodo;
 
    if ((posicionInodoEnDirectorio = BuscaFich(directorio, inodos, nombre)) == -1) {
       printf("El fichero seleccionado para borrar no existe\n");
+   } else {
+      // Dentro del directorio coge el que corresponde con el de la iteracion de BuscarFich
+      inodo = directorio[posicionInodoEnDirectorio].dir_inodo;
+
+      // De la lista de inodos coge el inodo correspondiente
+      EXT_SIMPLE_INODE* ubicacionInodo = &inodos->blq_inodos[inodo];
+
+      // (IMP: posicionInodoEnDirectorio es el indice del inodo en el directorio, inodo es el indice del inodo en la lista de inodos, ubicacionInodo es el inodo en si)
+
+      // Borra toda la informacion de los bloques
+      for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++){
+         int bloqueBorrar = ubicacionInodo->i_nbloque[i];
+         if (bloqueBorrar != NULL_BLOQUE) {
+            // Marcamos el bloque como no ocupado y aumentamos el numero de no ocupados de manera correspondiente
+            ext_bytemaps->bmap_bloques[bloqueBorrar] = 0;
+            ext_superblock->s_free_blocks_count++;
+            ubicacionInodo->i_nbloque[i] = NULL_BLOQUE;  
+         }
+      } 
+
+      // Hacemos lo mismo para el inodo correspondiente 
+      ext_bytemaps->bmap_inodos[inodo] = 0;
+      ext_superblock->s_free_inodes_count++;
+
+      // Borramos el nombre del directorio, el inodo y el tamaño del fichero
+      strcpy(directorio[posicionInodoEnDirectorio].dir_nfich, "");
+      directorio[posicionInodoEnDirectorio].dir_inodo = NULL_INODO;
+      ubicacionInodo->size_fichero = 0;
+
    }
-
-
-   // Dentro del directorio coge el que corresponde con el de la iteracion de BuscarFich
-   inodo = directorio[posicionInodoEnDirectorio].dir_inodo;
-
-   EXT_SIMPLE_INODE* ubicacionInodo = &inodos->blq_inodos[inodo];
-
-   // Borra toda la informacion de los bloques
-   for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++){
-      // de la lista de in
-      int bloqueBorrar = ubicacionInodo->i_nbloque[i];
-      if (bloqueBorrar != NULL_BLOQUE) {
-         // Marcamos el bloque como no ocupado y aumentamos el numero de no ocupados de manera correspondiente
-         ext_bytemaps->bmap_bloques[bloqueBorrar] = 0;
-         ext_superblock->s_free_blocks_count++;
-         ubicacionInodo->i_nbloque[i] = NULL_BLOQUE;  
-      }
-
-   } 
-
-   // Hacemos lo mismo para el inodo correspondiente 
-   ext_bytemaps->bmap_inodos[inodo] = 0;
-   ext_superblock->s_free_inodes_count++;
-
-   // Borramos el nombre del directorio, el inodo y el tamaño del fichero
-   directorio[posicionInodoEnDirectorio].dir_nfich[0] = '\0';
-   directorio[posicionInodoEnDirectorio].dir_inodo = NULL_INODO;
-   ubicacionInodo->size_fichero = 0;
-
    return posicionInodoEnDirectorio;
 }
 
