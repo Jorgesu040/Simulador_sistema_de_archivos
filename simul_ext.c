@@ -258,7 +258,7 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
       }
       else
       {
-         printf("Error: Comando no valido\n");
+         printf("Error: Comando no valido: %s\n (validos: info, bytemaps, dir, rename, imprimir, remove, copy, salir)\n", orden);
       }
    }
 
