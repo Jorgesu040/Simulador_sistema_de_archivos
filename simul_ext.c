@@ -424,9 +424,52 @@ int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
 
 int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, EXT_DATOS *memdatos, char *nombreorigen, char *nombredestino, FILE *fich)
 {
-   // Implementación de la función para copiar un archivo
-   return 0;
+    int i, inodo_origen = -1, inodo_destino = -1;
+
+    // Buscamos el archivo de origen en el directorio
+    for (i = 0; i < LEN_NFICH; i++) {
+        if (directorio[i].dir_inodo != NULL_INODO &&
+            strcmp(directorio[i].dir_nfich, nombreorigen) == 0) {
+            inodo_origen = directorio[i].dir_inodo;
+            break;
+        }
+    }
+
+    if (inodo_origen == -1) {
+        fprintf(stderr, "Archivo origen no encontrado.\n");
+        return -1; //el archivo origen no encontrado
+    }
+
+    // Verificamos si el archivo destino ya existe
+    for (i = 0; i < LEN_NFICH; i++) {
+        if (directorio[i].dir_inodo != NULL_INODO &&
+            strcmp(directorio[i].dir_nfich, nombredestino) == 0) {
+            fprintf(stderr, "El archivo destino ya existe.\n");
+            return -1; //el archivo destino ya existe
+        }
+    }
+
+    // Buscamos un espacio libre en el directorio
+    for (i = 0; i < LEN_NFICH; i++) {
+        if (directorio[i].dir_inodo == NULL_INODO) {
+            inodo_destino = i;
+            break;
+        }
+    }
+
+    if (inodo_destino == -1) {
+        fprintf(stderr, "No hay espacio en el directorio.\n");
+        return -1; //el directorio está lleno
+    }
+
+    // Asignamos el nuevo archivo al directorio
+    strcpy(directorio[inodo_destino].dir_nfich, nombredestino);
+    directorio[inodo_destino].dir_inodo = inodo_origen;
+
+    fprintf(fich, "Archivo '%s' copiado como '%s'.\n", nombreorigen, nombredestino);
+    return 0;
 }
+
 
 void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, FILE *fich)
 {
