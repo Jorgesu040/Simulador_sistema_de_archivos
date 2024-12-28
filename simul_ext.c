@@ -47,6 +47,7 @@ int main()
    EXT_BYTE_MAPS ext_bytemaps;
    EXT_BLQ_INODOS ext_blq_inodos;
    EXT_ENTRADA_DIR directorio[MAX_FICHEROS];
+   // Una lista (una estructura) que contiene MAX_BLOQUES_DATOS bloques de datos, cada elemento de la lista tiene un unsigned char dato[SIZE_BLOQUE]
    EXT_DATOS memdatos[MAX_BLOQUES_DATOS];
    // Puntero al buffer donde se almacenan los datos leidos
    EXT_DATOS datosfich[MAX_BLOQUES_PARTICION];
@@ -424,61 +425,109 @@ int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
 
 int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, EXT_DATOS *memdatos, char *nombreorigen, char *nombredestino, FILE *fich)
 {
-    int i, inodo_origen = -1, inodo_destino = -1;
+   int i, inodo_destino = -1, entrada_directorio_destino = -1;
+   int origenCorrecto, destinoCorrecto;
+   int copiadoCorrecto = 0;
 
-    // Buscamos el archivo de origen en el directorio
-    for (i = 0; i < LEN_NFICH; i++) {
-        if (directorio[i].dir_inodo != NULL_INODO &&
-            strcmp(directorio[i].dir_nfich, nombreorigen) == 0) {
-            inodo_origen = directorio[i].dir_inodo;
-            break;
-        }
-    }
+   // Buscamos el archivo de origen en el directorio
+   if ((origenCorrecto = BuscaFich(directorio, inodos, nombreorigen)) == -1)
+   {
+      printf("Archivo origen no encontrado.\n");
+      copiadoCorrecto = -1;
+   }
 
-    if (inodo_origen == -1) {
-        fprintf(stderr, "Archivo origen no encontrado.\n");
-        return -1; //el archivo origen no encontrado
-    }
+   // Verificamos si el archivo destino ya existe
+   if ((destinoCorrecto = BuscaFich(directorio, inodos, nombredestino)) != -1)
+   {
+      printf("Archivo destino ya existe.\n");
+      copiadoCorrecto = -1;
+   }
 
-    // Verificamos si el archivo destino ya existe
-    for (i = 0; i < LEN_NFICH; i++) {
-        if (directorio[i].dir_inodo != NULL_INODO &&
-            strcmp(directorio[i].dir_nfich, nombredestino) == 0) {
-            fprintf(stderr, "El archivo destino ya existe.\n");
-            return -1; //el archivo destino ya existe
-        }
-    }
+   // Buscamos un espacio libre en el directorio
+   i = 0;
+   while (i < MAX_INODOS && inodo_destino == -1)
+   {
+      if (ext_bytemaps->bmap_inodos[i] == 0)
+      { // Compare to numeric 0
+         inodo_destino = i;
+      }
+      i++;
+   }
 
-    // Buscamos un espacio libre en el directorio
-    for (i = 0; i < LEN_NFICH; i++) {
-        if (directorio[i].dir_inodo == NULL_INODO) {
-            inodo_destino = i;
-            break;
-        }
-    }
+   // Mensaje de error si quedan inodos
+   if (inodo_destino == -1)
+   {
+      printf("No hay espacio en el directorio.\n");
+      copiadoCorrecto = -1;
+   }
 
-    if (inodo_destino == -1) {
-        fprintf(stderr, "No hay espacio en el directorio.\n");
-        return -1; //el directorio está lleno
-    }
+   // Comprobacion de la longitud del nombre de destino
+   if (strlen(nombredestino) > LEN_NFICH - 1) {
+      // strlen no cuenta el \0 asi que el maximo es LONGITUD_NFICH - 1
+      printf("El nombre del fichero de destino es demasiado largo\n");
+      copiadoCorrecto = -1;
+   }
 
-    // Asignamos el nuevo archivo al directorio
-    strcpy(directorio[inodo_destino].dir_nfich, nombredestino);
-    directorio[inodo_destino].dir_inodo = inodo_origen;
+   // Busqueda de una entrada libre en el directorio
+   i = 0;
+   while (i < MAX_FICHEROS && entrada_directorio_destino == -1) {
+      if (directorio[i].dir_inodo == NULL_INODO) {
+         entrada_directorio_destino = i;
+      }
+      i++;
+   }
+   // Mensaje de error si no hay entradas libres en el directorio
+   if (entrada_directorio_destino == -1)
+   {
+      printf("No hay espacio en el directorio.\n");
+      copiadoCorrecto = -1;
+   }
 
-    fprintf(fich, "Archivo '%s' copiado como '%s'.\n", nombreorigen, nombredestino);
-    return 0;
+   // Proceso de copiado
+   if (copiadoCorrecto != -1){
+      ext_bytemaps->bmap_inodos[inodo_destino] = 1;
+      ext_superblock->s_free_inodes_count--;
+
+      // Copiamos el nombre del archivo
+      strcpy(directorio[entrada_directorio_destino].dir_nfich, nombredestino);
+      directorio[entrada_directorio_destino].dir_inodo = inodo_destino;
+
+      // Copiamos el tamaño del archivo
+      inodos->blq_inodos[inodo_destino].size_fichero = inodos->blq_inodos[directorio[origenCorrecto].dir_inodo].size_fichero;
+      unsigned short *numBloquesOrigen = inodos->blq_inodos[directorio[origenCorrecto].dir_inodo].i_nbloque;
+      for (int j = 0; j < MAX_NUMS_BLOQUE_INODO; j++)
+      {
+         if (numBloquesOrigen[j] != NULL_BLOQUE)
+         {
+            int k = 0;
+            int bloqueLibre = -1;
+            while (k < MAX_BLOQUES_DATOS && bloqueLibre == -1)
+            {
+               {
+                  if (ext_bytemaps->bmap_bloques[k] == 0)
+                  {
+                     ext_bytemaps->bmap_bloques[k] = 1;
+                     ext_superblock->s_free_blocks_count--;
+                     // Añadir el bloque a la lista de bloques del inodo
+                     inodos->blq_inodos[inodo_destino].i_nbloque[j] = k;
+                     memcpy(&memdatos[k], &memdatos[numBloquesOrigen[j] - PRIM_BLOQUE_DATOS], SIZE_BLOQUE);
+                     bloqueLibre = 1;
+                  }
+                  k++;
+               }
+            }
+         }
+      }
+   }
 }
-
 
 void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, FILE *fich)
 {
    // Implementación de la función para grabar inodos y directorio
-
    fseek(fich, 2 * SIZE_BLOQUE, SEEK_SET);
    fwrite(inodos, 1, SIZE_BLOQUE, fich);
    fseek(fich, 3 * SIZE_BLOQUE, SEEK_SET);
-   fwrite(directorio, 1, SIZE_BLOQUE, fich);
+   fwrite(directorio, sizeof(EXT_ENTRADA_DIR), MAX_FICHEROS, fich);
 }
 
 void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich)
