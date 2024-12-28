@@ -41,8 +41,6 @@ int main()
    char argumento1[LONGITUD_COMANDO];
    char argumento2[LONGITUD_COMANDO];
 
-   int i, j;
-   unsigned long int m;
    EXT_SIMPLE_SUPERBLOCK ext_superblock;
    EXT_BYTE_MAPS ext_bytemaps;
    EXT_BLQ_INODOS ext_blq_inodos;
@@ -51,7 +49,6 @@ int main()
    EXT_DATOS memdatos[MAX_BLOQUES_DATOS];
    // Puntero al buffer donde se almacenan los datos leidos
    EXT_DATOS datosfich[MAX_BLOQUES_PARTICION];
-   int entradadir;
    int grabardatos;
    FILE *fent;
 
@@ -86,6 +83,7 @@ int main()
    memcpy(&memdatos, (EXT_DATOS *)&datosfich[4], MAX_BLOQUES_DATOS * SIZE_BLOQUE);
 
    // Bucle de tratamiento de comandos
+   // Este bucle se ejecuta hasta que shouldExit sea 1
    for (;;)
    {
       do
@@ -93,22 +91,28 @@ int main()
          printf(">> ");
          fflush(stdin);
          fgets(comando, LONGITUD_COMANDO, stdin);
+
+      // Comprobamos si el comando es valido y si no lo es, volvemos a pedirlo
       } while (ComprobarComando(comando, orden, argumento1, argumento2) != 0);
 
+      // Procesamos el comando y si el comando es salir, shouldExit se pone a 1 y se sale del bucle
       shouldExit = ProcesarComando(orden, argumento1, argumento2, &ext_superblock, &ext_bytemaps, &ext_blq_inodos, directorio, memdatos, fent, &grabardatos);
 
+      // Si se ha modificado (marcado por copy, remove o rename) se graban los datos
       if (grabardatos)
          GrabarDatos(memdatos, fent);
 
       grabardatos = 0;
 
-      if (shouldExit) {
+      if (shouldExit)
+      {
          fclose(fent);
          break;
       }
    }
 }
 
+// Funcion que procesa los comandos
 int ProcesarComando(char *orden, char *argumento1, char *argumento2,
                     EXT_SIMPLE_SUPERBLOCK *ext_superblock, EXT_BYTE_MAPS *ext_bytemaps,
                     EXT_BLQ_INODOS *ext_blq_inodos, EXT_ENTRADA_DIR *directorio,
@@ -128,7 +132,7 @@ int ProcesarComando(char *orden, char *argumento1, char *argumento2,
       Directorio(directorio, ext_blq_inodos);
    }
    else if (strcmp(orden, "rename") == 0)
-   {  
+   {
       Renombrar(directorio, ext_blq_inodos, argumento1, argumento2);
       *grabardatos = 1;
       Grabarinodosydirectorio(directorio, ext_blq_inodos, fent);
@@ -137,7 +141,9 @@ int ProcesarComando(char *orden, char *argumento1, char *argumento2,
    }
    else if (strcmp(orden, "imprimir") == 0)
    {
-      Imprimir(directorio, ext_blq_inodos, memdatos, argumento1);
+      if(Imprimir(directorio, ext_blq_inodos, memdatos, argumento1) == -2){
+         printf("El fichero seleccionado para imprimir no existe\n");
+      }
    }
    else if (strcmp(orden, "remove") == 0)
    {
@@ -149,11 +155,13 @@ int ProcesarComando(char *orden, char *argumento1, char *argumento2,
    }
    else if (strcmp(orden, "copy") == 0)
    {
-      Copiar(directorio, ext_blq_inodos, ext_bytemaps, ext_superblock, memdatos, argumento1, argumento2, fent);
-      *grabardatos = 1;
-      Grabarinodosydirectorio(directorio, ext_blq_inodos, fent);
-      GrabarByteMaps(ext_bytemaps, fent);
-      GrabarSuperBloque(ext_superblock, fent);
+      if (Copiar(directorio, ext_blq_inodos, ext_bytemaps, ext_superblock, memdatos, argumento1, argumento2, fent) != -1)
+      {
+         *grabardatos = 1;
+         Grabarinodosydirectorio(directorio, ext_blq_inodos, fent);
+         GrabarByteMaps(ext_bytemaps, fent);
+         GrabarSuperBloque(ext_superblock, fent);
+      }
    }
    else if (strcmp(orden, "salir") == 0)
    {
@@ -166,9 +174,9 @@ int ProcesarComando(char *orden, char *argumento1, char *argumento2,
    return 0;
 }
 
+// Muestra por pantalla la ocupación de inodos y los primeros 25 bloques
 void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps)
 {
-
    printf("Inodos: \t");
    for (int i = 0; i < MAX_INODOS; i++)
    {
@@ -182,6 +190,7 @@ void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps)
    putchar('\n');
 }
 
+// Divide el comando en orden y hasta dos argumentos
 int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argumento2)
 {
 
@@ -267,6 +276,7 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
    return comandoValido;
 }
 
+// Muestra la información más relevante del superbloque
 void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup)
 {
    printf("Bloque %d Bytes\n", psup->s_block_size);
@@ -277,9 +287,9 @@ void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup)
    printf("Primer bloque de datos = %d\n", psup->s_first_data_block);
 }
 
+// Retorna índice en el array 'directorio' o -1 si no se encuentra
 int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre)
 {
-   // Implementación de la función para buscar un archivo
 
    int i, tam;
    for (i = 0; i < MAX_FICHEROS; i++)
@@ -300,6 +310,7 @@ int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre)
    return -1; // no se encuentra el fichero
 }
 
+// Muestra la lista de ficheros y sus inodos correspondientes
 void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos)
 {
    for (int i = 0; i < MAX_FICHEROS; i++)
@@ -331,37 +342,41 @@ void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos)
    }
 }
 
+// Comprueba límites de longitud y luego renombra el fichero
 int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo)
 {
-   
+
    int posicionInodoEnDirectorio;
    int renombradoCorrecto = 0;
 
-   if ((posicionInodoEnDirectorio = BuscaFich(directorio, inodos, nombreantiguo)) == -1) {
+   if ((posicionInodoEnDirectorio = BuscaFich(directorio, inodos, nombreantiguo)) == -1)
+   {
       printf("El fichero seleccionado para renombrar no existe\n");
-   } else if (strlen(nombrenuevo) > LEN_NFICH - 1) {
+   }
+   else if (strlen(nombrenuevo) > LEN_NFICH - 1)
+   {
       // strlen no cuenta el \0 asi que el maximo es LONGITUD_NFICH - 1
       printf("El nombre del fichero es demasiado largo\n");
       renombradoCorrecto = -1;
-   } else {
+   }
+   else
+   {
       strcpy(directorio[posicionInodoEnDirectorio].dir_nfich, nombrenuevo);
       renombradoCorrecto = 1;
       printf("Fichero renombrado correctamente\n");
    }
 
-
    return renombradoCorrecto;
 }
 
+ // Permite imprimir fichero desde memdatos (depedencia en BuscaFich)
 int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre)
 {
-   // Implementación de la función para imprimir el contenido de un archivo
-
    int i, j;
    unsigned long int blnumber;
    EXT_DATOS datosfichero[MAX_NUMS_BLOQUE_INODO];
    i = BuscaFich(directorio, inodos, nombre);
-   if (i > 0)
+   if (i != -1)
    {
       j = 0;
       do
@@ -383,34 +398,40 @@ int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *mem
    return -2; // no se encuentra el fichero
 }
 
+// Elimina el archivo: libera bloques, inodos y actualiza los byte maps (dependencia en BuscaFich)
 int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, char *nombre, FILE *fich)
-{  
+{
    int posicionInodoEnDirectorio;
    int inodo;
 
-   if ((posicionInodoEnDirectorio = BuscaFich(directorio, inodos, nombre)) == -1) {
+   if ((posicionInodoEnDirectorio = BuscaFich(directorio, inodos, nombre)) == -1)
+   {
       printf("El fichero seleccionado para borrar no existe\n");
-   } else {
+   }
+   else
+   {
       // Dentro del directorio coge el que corresponde con el de la iteracion de BuscarFich
       inodo = directorio[posicionInodoEnDirectorio].dir_inodo;
 
       // De la lista de inodos coge el inodo correspondiente
-      EXT_SIMPLE_INODE* ubicacionInodo = &inodos->blq_inodos[inodo];
+      EXT_SIMPLE_INODE *ubicacionInodo = &inodos->blq_inodos[inodo];
 
       // (IMP: posicionInodoEnDirectorio es el indice del inodo en el directorio, inodo es el indice del inodo en la lista de inodos, ubicacionInodo es el inodo en si)
 
       // Borra toda la informacion de los bloques
-      for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++){
+      for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++)
+      {
          int bloqueBorrar = ubicacionInodo->i_nbloque[i];
-         if (bloqueBorrar != NULL_BLOQUE) {
+         if (bloqueBorrar != NULL_BLOQUE)
+         {
             // Marcamos el bloque como no ocupado y aumentamos el numero de no ocupados de manera correspondiente
             ext_bytemaps->bmap_bloques[bloqueBorrar] = 0;
             ext_superblock->s_free_blocks_count++;
-            ubicacionInodo->i_nbloque[i] = NULL_BLOQUE;  
+            ubicacionInodo->i_nbloque[i] = NULL_BLOQUE;
          }
-      } 
+      }
 
-      // Hacemos lo mismo para el inodo correspondiente 
+      // Hacemos lo mismo para el inodo correspondiente
       ext_bytemaps->bmap_inodos[inodo] = 0;
       ext_superblock->s_free_inodes_count++;
 
@@ -418,13 +439,20 @@ int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
       strcpy(directorio[posicionInodoEnDirectorio].dir_nfich, "");
       directorio[posicionInodoEnDirectorio].dir_inodo = NULL_INODO;
       ubicacionInodo->size_fichero = 0;
-
    }
    return posicionInodoEnDirectorio;
 }
 
+// Copia un archivo de origen a destino (dependencia en BuscaFich)
 int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, EXT_DATOS *memdatos, char *nombreorigen, char *nombredestino, FILE *fich)
 {
+   /*
+   1. Busca fichero origen
+   2. Verifica que destino no exista
+   3. Reserva inodo destino
+   4. Reserva bloques y copia contenido en la estructura de datos: memdatos
+   */
+
    int i, inodo_destino = -1, entrada_directorio_destino = -1;
    int origenCorrecto, destinoCorrecto;
    int copiadoCorrecto = 0;
@@ -462,7 +490,8 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
    }
 
    // Comprobacion de la longitud del nombre de destino
-   if (strlen(nombredestino) > LEN_NFICH - 1) {
+   if (strlen(nombredestino) > LEN_NFICH - 1)
+   {
       // strlen no cuenta el \0 asi que el maximo es LONGITUD_NFICH - 1
       printf("El nombre del fichero de destino es demasiado largo\n");
       copiadoCorrecto = -1;
@@ -470,8 +499,10 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
 
    // Busqueda de una entrada libre en el directorio
    i = 0;
-   while (i < MAX_FICHEROS && entrada_directorio_destino == -1) {
-      if (directorio[i].dir_inodo == NULL_INODO) {
+   while (i < MAX_FICHEROS && entrada_directorio_destino == -1)
+   {
+      if (directorio[i].dir_inodo == NULL_INODO)
+      {
          entrada_directorio_destino = i;
       }
       i++;
@@ -484,7 +515,8 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
    }
 
    // Proceso de copiado
-   if (copiadoCorrecto != -1){
+   if (copiadoCorrecto != -1)
+   {
       ext_bytemaps->bmap_inodos[inodo_destino] = 1;
       ext_superblock->s_free_inodes_count--;
 
@@ -518,38 +550,38 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
             }
          }
       }
+      printf("Archivo %s copiado correctamente con el nombre %s\n", nombreorigen, nombredestino);
    }
+
+   return copiadoCorrecto;
 }
 
+// Funciones de grabación de los inodos y el directorio en el fichero
 void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, FILE *fich)
 {
-   // Implementación de la función para grabar inodos y directorio
    fseek(fich, 2 * SIZE_BLOQUE, SEEK_SET);
    fwrite(inodos, 1, SIZE_BLOQUE, fich);
    fseek(fich, 3 * SIZE_BLOQUE, SEEK_SET);
    fwrite(directorio, sizeof(EXT_ENTRADA_DIR), MAX_FICHEROS, fich);
 }
 
+// Funciones de grabación de los bytemaps en el fichero
 void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich)
 {
-   // Implementación de la función para grabar los mapas de bytes
-
    fseek(fich, SIZE_BLOQUE, SEEK_SET);
    fwrite(ext_bytemaps, 1, sizeof(EXT_BYTE_MAPS), fich);
 }
 
+// Funciones de grabación del superbloque en el fichero
 void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK *ext_superblock, FILE *fich)
 {
-   // Implementación de la función para grabar el superbloque
-
    fseek(fich, 0, SEEK_SET);
    fwrite(ext_superblock, 1, SIZE_BLOQUE, fich);
 }
 
+// Funciones de grabación de los datos en el fichero
 void GrabarDatos(EXT_DATOS *memdatos, FILE *fich)
 {
-   // Implementación de la función para grabar los datos
-
    fseek(fich, 4 * SIZE_BLOQUE, SEEK_SET);
    fwrite(memdatos, MAX_BLOQUES_DATOS, SIZE_BLOQUE, fich);
 }
