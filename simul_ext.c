@@ -244,7 +244,7 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
       {
          comandoValido = 0;
       }
-      else if (strcmp(orden, "imprimir") == 0 || strcmp(orden, "remove") == 0 && contadorArgumentos == 2)
+      else if (strcmp(orden, "imprimir") == 0 || strcmp(orden, "remove") == 0 || contadorArgumentos == 2)
       {
          if (strlen(argumento1) > 0)
          {
@@ -255,7 +255,7 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
             printf("Error: Falta argumento\n");
          }
       }
-      else if (strcmp(orden, "rename") == 0 || strcmp(orden, "copy") == 0 && contadorArgumentos == 3)
+      else if (strcmp(orden, "rename") == 0 || strcmp(orden, "copy") == 0 || contadorArgumentos == 3)
       {
          if (strlen(argumento1) > 0 && strlen(argumento2) > 0)
          {
