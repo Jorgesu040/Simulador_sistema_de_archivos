@@ -141,7 +141,7 @@ int ProcesarComando(char *orden, char *argumento1, char *argumento2,
    }
    else if (strcmp(orden, "imprimir") == 0)
    {
-      if(Imprimir(directorio, ext_blq_inodos, memdatos, argumento1) == -2){
+      if(Imprimir(directorio, ext_blq_inodos, memdatos, argumento1) == -1){
          printf("El fichero seleccionado para imprimir no existe\n");
       }
    }
@@ -244,7 +244,7 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
       {
          comandoValido = 0;
       }
-      else if (strcmp(orden, "rename") == 0 || strcmp(orden, "imprimir") == 0 || strcmp(orden, "remove") == 0 && contadorArgumentos == 2)
+      else if (strcmp(orden, "imprimir") == 0 || strcmp(orden, "remove") == 0 && contadorArgumentos == 2)
       {
          if (strlen(argumento1) > 0)
          {
@@ -255,7 +255,7 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
             printf("Error: Falta argumento\n");
          }
       }
-      else if (strcmp(orden, "copy") == 0 && contadorArgumentos == 3)
+      else if (strcmp(orden, "rename") == 0 || strcmp(orden, "copy") == 0 && contadorArgumentos == 3)
       {
          if (strlen(argumento1) > 0 && strlen(argumento2) > 0)
          {
@@ -395,7 +395,7 @@ int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *mem
       printf("\n");
    }
 
-   return -2; // no se encuentra el fichero
+   return i; // no se encuentra el fichero si i == -1
 }
 
 // Elimina el archivo: libera bloques, inodos y actualiza los byte maps (dependencia en BuscaFich)
