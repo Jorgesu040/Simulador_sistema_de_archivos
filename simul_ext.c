@@ -535,18 +535,15 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
             int bloqueLibre = -1;
             while (k < MAX_BLOQUES_DATOS && bloqueLibre == -1)
             {
+               if (ext_bytemaps->bmap_bloques[k] == 0)
                {
-                  if (ext_bytemaps->bmap_bloques[k] == 0)
-                  {
-                     ext_bytemaps->bmap_bloques[k] = 1;
-                     ext_superblock->s_free_blocks_count--;
-                     // Añadir el bloque a la lista de bloques del inodo
-                     inodos->blq_inodos[inodo_destino].i_nbloque[j] = k;
-                     memcpy(&memdatos[k], &memdatos[numBloquesOrigen[j] - PRIM_BLOQUE_DATOS], SIZE_BLOQUE);
-                     bloqueLibre = 1;
-                  }
-                  k++;
+                  ext_bytemaps->bmap_bloques[k] = 1;
+                  ext_superblock->s_free_blocks_count--;
+                  inodos->blq_inodos[inodo_destino].i_nbloque[j] = k;
+                  memcpy(&memdatos[k - PRIM_BLOQUE_DATOS], &memdatos[numBloquesOrigen[j] - PRIM_BLOQUE_DATOS], SIZE_BLOQUE);
+                  bloqueLibre = 1;
                }
+               k++;
             }
          }
       }
